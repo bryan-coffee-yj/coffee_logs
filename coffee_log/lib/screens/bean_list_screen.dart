@@ -240,14 +240,21 @@ class _BeanListScreenState extends ConsumerState<BeanListScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      Row(
+                      Wrap(
+                        spacing: 8, // Horizontal space between tags
+                        runSpacing:
+                            8, // Vertical space when it drops to line 2!
                         children: [
                           _buildTag(
                             Icons.whatshot,
                             bean.roastLevel,
                             CoffeeColors.primary,
                           ),
-                          const SizedBox(width: 8),
+                          _buildTag(
+                            Icons.eco_outlined,
+                            bean.process,
+                            Colors.teal.shade700,
+                          ),
                           _buildTag(
                             Icons.calendar_today,
                             '$daysSinceRoast Days Ago',
@@ -401,7 +408,7 @@ class _BeanListScreenState extends ConsumerState<BeanListScreen> {
 
                       // Display Price and Initial Weight beautifully
                       Text(
-                        'Stats: ${bean.initialWeight}g ${bean.price != null ? "• RM${bean.price!.toStringAsFixed(2)}" : ""}',
+                        'Stats: ${bean.process} • ${bean.initialWeight}g ${bean.price != null ? "• RM${bean.price!.toStringAsFixed(2)}" : ""}',
                         style: GoogleFonts.inter(
                           fontSize: 13,
                           color: Colors.grey.shade600,

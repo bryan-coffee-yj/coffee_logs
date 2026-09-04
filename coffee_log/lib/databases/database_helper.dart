@@ -12,7 +12,7 @@ class DatabaseHelper {
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    _database = await _initDB('coffee_log_v3.db');
+    _database = await _initDB('coffee_log_v4.db');
     return _database!;
   }
 
@@ -37,18 +37,19 @@ class DatabaseHelper {
     const realType = 'REAL NOT NULL';
     const realTypeNullable = 'REAL';
 
-    // 1. Create Beans Table (Supports archiving)
+    // 1. Create Beans Table
     await db.execute('''
     CREATE TABLE coffee_beans (
       id $idType,
       roasterName $textType,
       beanName $textType,
       roastLevel $textType,
+      process $textType, 
       roastDate $textType,
       price $realTypeNullable,
       initialWeight $realType,
       currentWeight $realType,
-      isArchived $intType DEFAULT 0, -- 0 = active, 1 = archived
+      isArchived $intType DEFAULT 0,
       archiveStatus $textNullableType,
       archiveNotes $textNullableType
     )

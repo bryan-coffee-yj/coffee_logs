@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:ui';
 
 import '../models/brew_method.dart';
 import '../providers/method_provider.dart';
@@ -110,347 +111,403 @@ class _AddBrewScreenState extends ConsumerState<AddBrewScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
     return Scaffold(
-      backgroundColor: CoffeeColors.background,
-      appBar: AppBar(
-        title: const Text('Prepare Recipe'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.save, color: CoffeeColors.primary),
-            onPressed: _saveBrew,
+      extendBodyBehindAppBar:
+          true, // Lets gradient canvas flow under the header!
+      // --- FROSTED GLASS APPBAR ---
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(kToolbarHeight),
+        child: ClipRRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+            child: AppBar(
+              backgroundColor: Colors.white.withValues(alpha: 0.6),
+              scrolledUnderElevation: 0.0, // Kills the grey scroll tint!
+              title: const Text('Prepare Recipe'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.save, color: CoffeeColors.primary),
+                  onPressed: _saveBrew,
+                ),
+                const SizedBox(width: 8),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          // Header
-          Text(
-            widget.bean.beanName,
-            style: GoogleFonts.montserrat(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: CoffeeColors.textDark,
-            ),
-          ),
-          Text(
-            'Remaining: ${widget.bean.currentWeight}g',
-            style: GoogleFonts.inter(
-              color: CoffeeColors.primary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 24),
 
-          // --- TEMPLATE SELECTOR ---
-          Consumer(
-            builder: (context, ref, child) {
-              final methodsState = ref.watch(methodProvider);
-              return methodsState.when(
-                loading: () => const SizedBox(),
-                error: (e, s) => const SizedBox(),
-                data: (methods) {
-                  if (methods.isEmpty) return const SizedBox();
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 24),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 4,
+      // --- GRADIENT CANVAS + DASHBOARD BODY ---
+      body: Stack(
+        children: [
+          // 1. Soft organic warm milk gradient background
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Colors.white, Color(0xFFFFFBF0), Color(0xFFF5EFE6)],
+              ),
+            ),
+          ),
+
+          // 2. The Content with safe top padding to clear the glass header
+          ListView(
+            padding: const EdgeInsets.only(
+              top: 110,
+              bottom: 40,
+              left: 20,
+              right: 20,
+            ),
+            children: [
+              // Header
+              Text(
+                widget.bean.beanName,
+                style: GoogleFonts.montserrat(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: CoffeeColors.textDark,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Text(
+                    'Remaining: ${widget.bean.currentWeight.toStringAsFixed(1)}g',
+                    style: GoogleFonts.inter(
+                      color: CoffeeColors.primary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
                     ),
-                    decoration: BoxDecoration(
-                      color: CoffeeColors.primary.withOpacity(0.05),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: CoffeeColors.primary.withOpacity(0.2),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '• ${widget.bean.process}',
+                    style: GoogleFonts.inter(
+                      color: Colors.teal.shade700,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              // --- TEMPLATE SELECTOR ---
+              Consumer(
+                builder: (context, ref, child) {
+                  final methodsState = ref.watch(methodProvider);
+                  return methodsState.when(
+                    loading: () => const SizedBox(),
+                    error: (e, s) => const SizedBox(),
+                    data: (methods) {
+                      if (methods.isEmpty) return const SizedBox();
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 24),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: CoffeeColors.primary.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: CoffeeColors.primary.withOpacity(0.2),
+                          ),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<BrewMethod>(
+                            isExpanded: true,
+                            hint: Text(
+                              'Apply Saved Recipe...',
+                              style: GoogleFonts.inter(
+                                color: CoffeeColors.primary,
+                              ),
+                            ),
+                            value: _selectedMethod,
+                            icon: const Icon(
+                              Icons.auto_awesome,
+                              color: CoffeeColors.primary,
+                              size: 18,
+                            ),
+                            items: methods
+                                .map(
+                                  (m) => DropdownMenuItem(
+                                    value: m,
+                                    child: Text(
+                                      m.methodName,
+                                      style: GoogleFonts.montserrat(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (method) {
+                              if (method != null) _applyMethodTemplate(method);
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+              // --- BREW METHOD & EQUIPMENT ---
+              Row(
+                children: [
+                  // Method Dropdown
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: CoffeeColors.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          isExpanded: true,
+                          value: _brewMethod,
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down,
+                            size: 16,
+                            color: CoffeeColors.primary,
+                          ),
+                          style: GoogleFonts.inter(
+                            color: CoffeeColors.textDark,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                          items:
+                              [
+                                    'Pour-over',
+                                    'Espresso',
+                                    'Moka Pot',
+                                    'French Press',
+                                    'Aeropress',
+                                  ]
+                                  .map(
+                                    (m) => DropdownMenuItem(
+                                      value: m,
+                                      child: Text(m),
+                                    ),
+                                  )
+                                  .toList(),
+                          onChanged: (val) =>
+                              setState(() => _brewMethod = val!),
+                        ),
                       ),
                     ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<BrewMethod>(
-                        isExpanded: true,
-                        hint: Text(
-                          'Apply Saved Recipe...',
-                          style: GoogleFonts.inter(color: CoffeeColors.primary),
+                  ),
+                  const SizedBox(width: 12),
+                  // Equipment Input (Uses the same Bottom Sheet modal!)
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => _showInputDialog(
+                        title: 'Brewer / Equipment',
+                        initialValue: _equipment,
+                        isNumber: false,
+                        onSave: (v) => setState(() => _equipment = v),
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 16,
                         ),
-                        value: _selectedMethod,
-                        icon: const Icon(
-                          Icons.auto_awesome,
-                          color: CoffeeColors.primary,
-                          size: 18,
+                        decoration: BoxDecoration(
+                          color: CoffeeColors.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade200),
                         ),
-                        items: methods
-                            .map(
-                              (m) => DropdownMenuItem(
-                                value: m,
-                                child: Text(
-                                  m.methodName,
-                                  style: GoogleFonts.montserrat(
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _equipment,
+                                style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                  color: CoffeeColors.textDark,
                                 ),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            )
-                            .toList(),
-                        onChanged: (method) {
-                          if (method != null) _applyMethodTemplate(method);
+                            ),
+                            const Icon(
+                              Icons.edit,
+                              size: 14,
+                              color: CoffeeColors.primary,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // --- THE 2x2 PREMIUM GRID ---
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildGridCard(
+                      title: 'Coffee Amount',
+                      value: '$_dose g',
+                      icon: Icons
+                          .coffee, // Note: using grain as fallback if coffee_bean isn't in your icon pack
+                      color: CoffeeColors.primary,
+                      onTap: () => _showInputDialog(
+                        title: 'Coffee Amount (g)',
+                        initialValue: _dose.toString(),
+                        isNumber: true,
+                        onSave: (v) {
+                          double newDose = double.parse(v);
+                          setState(() {
+                            // SMART SCALING: If a method is selected, keep the exact same ratio!
+                            if (_selectedMethod != null) {
+                              _waterMass = double.parse(
+                                (newDose * _selectedMethod!.targetRatio)
+                                    .toStringAsFixed(1),
+                              );
+                            }
+                            _dose = newDose;
+                          });
                         },
                       ),
                     ),
-                  );
-                },
-              );
-            },
-          ),
-          // --- BREW METHOD & EQUIPMENT ---
-          Row(
-            children: [
-              // Method Dropdown
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 4,
                   ),
-                  decoration: BoxDecoration(
-                    color: CoffeeColors.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      isExpanded: true,
-                      value: _brewMethod,
-                      icon: const Icon(
-                        Icons.keyboard_arrow_down,
-                        size: 16,
-                        color: CoffeeColors.primary,
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildGridCard(
+                      title: 'Water Amount',
+                      value: '$_waterMass ml',
+                      icon: Icons.water_drop,
+                      color: Colors.blue.shade600,
+                      onTap: () => _showInputDialog(
+                        title: 'Water Amount (ml)',
+                        initialValue: _waterMass.toString(),
+                        isNumber: true,
+                        onSave: (v) =>
+                            setState(() => _waterMass = double.parse(v)),
                       ),
-                      style: GoogleFonts.inter(
-                        color: CoffeeColors.textDark,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                      items:
-                          [
-                                'Pour-over',
-                                'Espresso',
-                                'Moka Pot',
-                                'French Press',
-                                'Aeropress',
-                              ]
-                              .map(
-                                (m) =>
-                                    DropdownMenuItem(value: m, child: Text(m)),
-                              )
-                              .toList(),
-                      onChanged: (val) => setState(() => _brewMethod = val!),
                     ),
                   ),
-                ),
+                ],
               ),
-              const SizedBox(width: 12),
-              // Equipment Input (Uses the same Bottom Sheet modal!)
-              Expanded(
-                child: InkWell(
-                  onTap: () => _showInputDialog(
-                    title: 'Brewer / Equipment',
-                    initialValue: _equipment,
-                    isNumber: false,
-                    onSave: (v) => setState(() => _equipment = v),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildGridCard(
+                      title: _grinder, // Dynamically shows your grinder name!
+                      value: _grindSize,
+                      icon: Icons.settings,
+                      color: Colors.green.shade600,
+                      onTap: _showGrinderDialog, // Calls our new custom modal
+                    ),
                   ),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 16,
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildGridCard(
+                      title: 'Heat',
+                      value: '$_temperature°C',
+                      icon: Icons.local_fire_department,
+                      color: Colors.deepOrange.shade500,
+                      onTap: () => _showInputDialog(
+                        title: 'Temperature (°C)',
+                        initialValue: _temperature.toString(),
+                        isNumber: true,
+                        onSave: (v) =>
+                            setState(() => _temperature = double.parse(v)),
+                      ),
                     ),
-                    decoration: BoxDecoration(
-                      color: CoffeeColors.surface,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade200),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 32),
+
+              // --- TIME & PROCESS ---
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'PROCESS',
+                    style: GoogleFonts.montserrat(
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
                     ),
+                  ),
+                  InkWell(
+                    onTap: () => _showTimeDialog(),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Expanded(
-                          child: Text(
-                            _equipment,
-                            style: GoogleFonts.inter(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                              color: CoffeeColors.textDark,
-                            ),
-                            overflow: TextOverflow.ellipsis,
+                        const Icon(Icons.timer_outlined, size: 20),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${_timeMin.toString().padLeft(2, '0')}:${_timeSec.toString().padLeft(2, '0')}',
+                          style: GoogleFonts.inter(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
                           ),
-                        ),
-                        const Icon(
-                          Icons.edit,
-                          size: 14,
-                          color: CoffeeColors.primary,
                         ),
                       ],
                     ),
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
-          const SizedBox(height: 24),
+              const SizedBox(height: 32),
 
-          // --- THE 2x2 PREMIUM GRID ---
-          Row(
-            children: [
-              Expanded(
-                child: _buildGridCard(
-                  title: 'Coffee Amount',
-                  value: '$_dose g',
-                  icon: Icons
-                      .coffee, // Note: using grain as fallback if coffee_bean isn't in your icon pack
-                  color: CoffeeColors.primary,
-                  onTap: () => _showInputDialog(
-                    title: 'Coffee Amount (g)',
-                    initialValue: _dose.toString(),
-                    isNumber: true,
-                    onSave: (v) {
-                      double newDose = double.parse(v);
-                      setState(() {
-                        // SMART SCALING: If a method is selected, keep the exact same ratio!
-                        if (_selectedMethod != null) {
-                          _waterMass = double.parse(
-                            (newDose * _selectedMethod!.targetRatio)
-                                .toStringAsFixed(1),
-                          );
-                        }
-                        _dose = newDose;
-                      });
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildGridCard(
-                  title: 'Water Amount',
-                  value: '$_waterMass ml',
-                  icon: Icons.water_drop,
-                  color: Colors.blue.shade600,
-                  onTap: () => _showInputDialog(
-                    title: 'Water Amount (ml)',
-                    initialValue: _waterMass.toString(),
-                    isNumber: true,
-                    onSave: (v) => setState(() => _waterMass = double.parse(v)),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _buildGridCard(
-                  title: _grinder, // Dynamically shows your grinder name!
-                  value: _grindSize,
-                  icon: Icons.settings,
-                  color: Colors.green.shade600,
-                  onTap: _showGrinderDialog, // Calls our new custom modal
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildGridCard(
-                  title: 'Heat',
-                  value: '$_temperature°C',
-                  icon: Icons.local_fire_department,
-                  color: Colors.deepOrange.shade500,
-                  onTap: () => _showInputDialog(
-                    title: 'Temperature (°C)',
-                    initialValue: _temperature.toString(),
-                    isNumber: true,
-                    onSave: (v) =>
-                        setState(() => _temperature = double.parse(v)),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 32),
-
-          // --- TIME & PROCESS ---
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
+              // --- TASTING SLIDERS ---
               Text(
-                'PROCESS',
+                'TASTING PROFILE',
                 style: GoogleFonts.montserrat(
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.2,
                 ),
               ),
-              InkWell(
-                onTap: () => _showTimeDialog(),
-                child: Row(
-                  children: [
-                    const Icon(Icons.timer_outlined, size: 20),
-                    const SizedBox(width: 6),
-                    Text(
-                      '${_timeMin.toString().padLeft(2, '0')}:${_timeSec.toString().padLeft(2, '0')}',
-                      style: GoogleFonts.inter(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+              const SizedBox(height: 16),
+              _buildSlider(
+                'Acidity',
+                _acidity,
+                (v) => setState(() => _acidity = v),
+              ),
+              _buildSlider(
+                'Sweetness',
+                _sweetness,
+                (v) => setState(() => _sweetness = v),
+              ),
+              _buildSlider('Body', _body, (v) => setState(() => _body = v)),
+              const SizedBox(height: 24),
+
+              // Notes
+              Container(
+                decoration: BoxDecoration(
+                  color: CoffeeColors.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: TextField(
+                  controller: _notesCtrl,
+                  maxLines: 2,
+                  style: GoogleFonts.inter(),
+                  decoration: InputDecoration(
+                    hintText: 'Add Tag / Tasting Notes...',
+                    hintStyle: GoogleFonts.inter(color: Colors.grey.shade400),
+                    prefixIcon: const Icon(
+                      Icons.sell_outlined,
+                      color: CoffeeColors.primary,
                     ),
-                  ],
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.all(16),
+                  ),
                 ),
               ),
+              const SizedBox(height: 40),
             ],
           ),
-          const SizedBox(height: 32),
-
-          // --- TASTING SLIDERS ---
-          Text(
-            'TASTING PROFILE',
-            style: GoogleFonts.montserrat(
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 16),
-          _buildSlider(
-            'Acidity',
-            _acidity,
-            (v) => setState(() => _acidity = v),
-          ),
-          _buildSlider(
-            'Sweetness',
-            _sweetness,
-            (v) => setState(() => _sweetness = v),
-          ),
-          _buildSlider('Body', _body, (v) => setState(() => _body = v)),
-          const SizedBox(height: 24),
-
-          // Notes
-          Container(
-            decoration: BoxDecoration(
-              color: CoffeeColors.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: TextField(
-              controller: _notesCtrl,
-              maxLines: 2,
-              style: GoogleFonts.inter(),
-              decoration: InputDecoration(
-                hintText: 'Add Tag / Tasting Notes...',
-                hintStyle: GoogleFonts.inter(color: Colors.grey.shade400),
-                prefixIcon: const Icon(
-                  Icons.sell_outlined,
-                  color: CoffeeColors.primary,
-                ),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.all(16),
-              ),
-            ),
-          ),
-          const SizedBox(height: 40),
         ],
       ),
     );

@@ -3,21 +3,22 @@ class CoffeeBean {
   final String roasterName;
   final String beanName;
   final String roastLevel;
+  final String process; // NEW: Washed, Natural, Anaerobic, etc.
   final DateTime roastDate;
 
-  // INVENTORY & ARCHIVE FIELDS
   final double? price;
   final double initialWeight;
   final double currentWeight;
-  final bool isArchived; // true = Archived, false = Active Stash
-  final String? archiveStatus; // "best", "normal", "bad"
-  final String? archiveNotes; // Custom final thoughts on the bean
+  final bool isArchived;
+  final String? archiveStatus;
+  final String? archiveNotes;
 
   CoffeeBean({
     this.id,
     required this.roasterName,
     required this.beanName,
     required this.roastLevel,
+    this.process = 'Washed', // Default to Washed
     required this.roastDate,
     this.price,
     this.initialWeight = 0.0,
@@ -33,11 +34,12 @@ class CoffeeBean {
       'roasterName': roasterName,
       'beanName': beanName,
       'roastLevel': roastLevel,
+      'process': process, // NEW
       'roastDate': roastDate.toIso8601String(),
       'price': price,
       'initialWeight': initialWeight,
       'currentWeight': currentWeight,
-      'isArchived': isArchived ? 1 : 0, // SQLite stores bools as 1 or 0
+      'isArchived': isArchived ? 1 : 0,
       'archiveStatus': archiveStatus,
       'archiveNotes': archiveNotes,
     };
@@ -49,7 +51,10 @@ class CoffeeBean {
       roasterName: map['roasterName'] as String,
       beanName: map['beanName'] as String,
       roastLevel: map['roastLevel'] as String,
-      roastDate: DateTime.parse(map['roastDate'] as String),
+      process: map['process'] as String? ?? 'Washed', // NEW (safe fallback)
+      roastDate: DateTime.parse(
+        map['dateOfMaking'] ?? map['roastDate'] as String,
+      ),
       price: map['price'] as double?,
       initialWeight: (map['initialWeight'] as num?)?.toDouble() ?? 0.0,
       currentWeight: (map['currentWeight'] as num?)?.toDouble() ?? 0.0,
