@@ -41,6 +41,7 @@ dependencies:
   path_provider: ^2.1.5
   share_plus: ^13.1.0
   google_fonts: ^8.1.0
+  flutter_native_splash: ^2.4.7
 
 dev_dependencies:
   flutter_test:
@@ -98,6 +99,13 @@ flutter:
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "assets/icons/coffee_log_logo.png" # Changed to 'icons'
-  adaptive_icon_background: "#D9C19D" 
-  adaptive_icon_foreground: "assets/icons/coffee_log_logo.png" # Changed to 'icons'
+  image_path: "assets/icons/coffee_log_logo.png"
+  adaptive_icon_background: "#FFFFFF" 
+  adaptive_icon_foreground: "assets/icons/coffee_log_logo.png"
+
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: "assets/icons/coffee_log_logo.png"
+  android_12:
+    image: "assets/icons/coffee_log_logo.png"
+    icon_background_color: "#FFFFFF"

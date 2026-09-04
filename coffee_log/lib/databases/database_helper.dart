@@ -2,7 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/coffee_bean.dart';
 import '../models/brew_log.dart';
-import '../models/brew_method.dart'; // Import our new model!
+import '../models/brew_method.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -12,7 +12,7 @@ class DatabaseHelper {
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    _database = await _initDB('coffee_log.db');
+    _database = await _initDB('coffee_log_v3.db');
     return _database!;
   }
 
@@ -22,7 +22,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1, // Fresh start with a clean tables schema!
+      version: 1, // Fresh start with our absolute perfect schema
       onCreate: _createDB,
       onConfigure: (db) async => await db.execute('PRAGMA foreign_keys = ON'),
     );
@@ -31,12 +31,13 @@ class DatabaseHelper {
   Future _createDB(Database db, int version) async {
     const idType = 'INTEGER PRIMARY KEY AUTOINCREMENT';
     const textType = 'TEXT NOT NULL';
+    const textNullableType = 'TEXT';
     const intType = 'INTEGER NOT NULL';
     const intNullableType = 'INTEGER';
     const realType = 'REAL NOT NULL';
     const realTypeNullable = 'REAL';
 
-    // 1. Create Beans Table
+    // 1. Create Beans Table (Supports archiving)
     await db.execute('''
     CREATE TABLE coffee_beans (
       id $idType,
@@ -46,31 +47,35 @@ class DatabaseHelper {
       roastDate $textType,
       price $realTypeNullable,
       initialWeight $realType,
-      currentWeight $realType
+      currentWeight $realType,
+      isArchived $intType DEFAULT 0, -- 0 = active, 1 = archived
+      archiveStatus $textNullableType,
+      archiveNotes $textNullableType
     )
     ''');
 
-    // 2. NEW: Create Brew Methods Table
+    // 2. Create Brew Methods Table (Default equipment added!)
     await db.execute('''
     CREATE TABLE brew_methods (
       id $idType,
       methodName $textType,
       brewMethodType $textType,
+      equipment $textType, 
       defaultDose $realType,
       defaultWater $realType,
       stepsJson $textType
     )
     ''');
 
-    // 3. Create Brew Logs Table 
+    // 3. Create Brew Logs Table (Make sure appliedMethod is here!)
     await db.execute('''
     CREATE TABLE brew_logs (
       id $idType,
       beanId $intType,
       methodId $intNullableType, 
+      appliedMethod $textNullableType, -- <--- ADD THIS LINE!
       dateOfMaking $textType,
       brewMethod $textType,
-      appliedMethod $textType, -- <--- NEW: Added this line!
       equipment $textType,
       grinder $textType,
       grindSize $textType,
@@ -88,12 +93,37 @@ class DatabaseHelper {
     ''');
   }
 
-  // --- COFFEE BEAN CRUD ---
+  // ==========================================
+  // COFFEE BEAN CRUD
+  // ==========================================
   Future<int> insertCoffeeBean(CoffeeBean bean) async {
     final db = await instance.database;
     return await db.insert('coffee_beans', bean.toMap());
   }
 
+  // Get active beans (Stash)
+  Future<List<CoffeeBean>> getActiveCoffeeBeans() async {
+    final db = await instance.database;
+    final result = await db.query(
+      'coffee_beans',
+      where: 'isArchived = 0',
+      orderBy: 'id DESC',
+    );
+    return result.map((json) => CoffeeBean.fromMap(json)).toList();
+  }
+
+  // Get archived beans (Excel history)
+  Future<List<CoffeeBean>> getArchivedCoffeeBeans() async {
+    final db = await instance.database;
+    final result = await db.query(
+      'coffee_beans',
+      where: 'isArchived = 1',
+      orderBy: 'id DESC',
+    );
+    return result.map((json) => CoffeeBean.fromMap(json)).toList();
+  }
+
+  // Get ALL coffee beans (Crucial for the Export Service!)
   Future<List<CoffeeBean>> getAllCoffeeBeans() async {
     final db = await instance.database;
     final result = await db.query('coffee_beans', orderBy: 'id DESC');
@@ -115,7 +145,9 @@ class DatabaseHelper {
     return await db.delete('coffee_beans', where: 'id = ?', whereArgs: [id]);
   }
 
-  // --- NEW: BREW METHOD CRUD ---
+  // ==========================================
+  // BREW METHOD CRUD
+  // ==========================================
   Future<int> insertBrewMethod(BrewMethod method) async {
     final db = await instance.database;
     return await db.insert('brew_methods', method.toMap());
@@ -142,12 +174,15 @@ class DatabaseHelper {
     return await db.delete('brew_methods', where: 'id = ?', whereArgs: [id]);
   }
 
-  // --- BREW LOG CRUD ---
+  // ==========================================
+  // BREW LOG CRUD
+  // ==========================================
   Future<int> insertBrewLog(BrewLog log) async {
     final db = await instance.database;
     return await db.insert('brew_logs', log.toMap());
   }
 
+  // Get logs for a specific bean
   Future<List<BrewLog>> getBrewLogsForBean(int beanId) async {
     final db = await instance.database;
     final result = await db.query(
@@ -156,6 +191,13 @@ class DatabaseHelper {
       whereArgs: [beanId],
       orderBy: 'dateOfMaking DESC',
     );
+    return result.map((json) => BrewLog.fromMap(json)).toList();
+  }
+
+  // Get ALL brew logs (for the new global Home timeline!)
+  Future<List<BrewLog>> getAllBrewLogs() async {
+    final db = await instance.database;
+    final result = await db.query('brew_logs', orderBy: 'dateOfMaking DESC');
     return result.map((json) => BrewLog.fromMap(json)).toList();
   }
 
@@ -170,12 +212,6 @@ class DatabaseHelper {
     );
     if (result.isNotEmpty) return BrewLog.fromMap(result.first);
     return null;
-  }
-
-  Future<List<BrewLog>> getAllBrewLogs() async {
-    final db = await instance.database;
-    final result = await db.query('brew_logs', orderBy: 'dateOfMaking DESC');
-    return result.map((json) => BrewLog.fromMap(json)).toList();
   }
 
   Future<int> deleteBrewLog(int id) async {

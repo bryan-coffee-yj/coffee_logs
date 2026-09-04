@@ -5,10 +5,13 @@ class CoffeeBean {
   final String roastLevel;
   final DateTime roastDate;
 
-  // NEW INVENTORY FIELDS
+  // INVENTORY & ARCHIVE FIELDS
   final double? price;
   final double initialWeight;
   final double currentWeight;
+  final bool isArchived; // true = Archived, false = Active Stash
+  final String? archiveStatus; // "best", "normal", "bad"
+  final String? archiveNotes; // Custom final thoughts on the bean
 
   CoffeeBean({
     this.id,
@@ -19,6 +22,9 @@ class CoffeeBean {
     this.price,
     this.initialWeight = 0.0,
     this.currentWeight = 0.0,
+    this.isArchived = false,
+    this.archiveStatus,
+    this.archiveNotes,
   });
 
   Map<String, dynamic> toMap() {
@@ -31,6 +37,9 @@ class CoffeeBean {
       'price': price,
       'initialWeight': initialWeight,
       'currentWeight': currentWeight,
+      'isArchived': isArchived ? 1 : 0, // SQLite stores bools as 1 or 0
+      'archiveStatus': archiveStatus,
+      'archiveNotes': archiveNotes,
     };
   }
 
@@ -44,6 +53,9 @@ class CoffeeBean {
       price: map['price'] as double?,
       initialWeight: (map['initialWeight'] as num?)?.toDouble() ?? 0.0,
       currentWeight: (map['currentWeight'] as num?)?.toDouble() ?? 0.0,
+      isArchived: (map['isArchived'] as int?) == 1,
+      archiveStatus: map['archiveStatus'] as String?,
+      archiveNotes: map['archiveNotes'] as String?,
     );
   }
 }

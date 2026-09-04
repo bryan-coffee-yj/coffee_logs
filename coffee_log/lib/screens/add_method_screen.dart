@@ -16,13 +16,23 @@ class AddMethodScreen extends ConsumerStatefulWidget {
 class _AddMethodScreenState extends ConsumerState<AddMethodScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  String _methodName = '';
-  String _brewType = 'Pour-over';
-  double _defaultDose = 15.0;
-  double _defaultWater = 250.0;
+  // NEW: Persistent Controllers to prevent text from wiping!
+  final _nameCtrl = TextEditingController();
+  final _equipmentCtrl = TextEditingController();
+  final _doseCtrl = TextEditingController(text: '15.0');
+  final _waterCtrl = TextEditingController(text: '250.0');
 
-  // The list holding our custom steps
-  List<MethodStep> _steps = [];
+  String _brewType = 'Pour-over';
+  final List<MethodStep> _steps = [];
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _equipmentCtrl.dispose();
+    _doseCtrl.dispose();
+    _waterCtrl.dispose();
+    super.dispose();
+  }
 
   void _saveMethod() {
     if (_formKey.currentState!.validate()) {
@@ -33,13 +43,16 @@ class _AddMethodScreenState extends ConsumerState<AddMethodScreen> {
         return;
       }
 
-      _formKey.currentState!.save();
-
       final newMethod = BrewMethod(
-        methodName: _methodName,
+        methodName: _nameCtrl.text,
         brewMethodType: _brewType,
-        defaultDose: _defaultDose,
-        defaultWater: _defaultWater,
+        equipment: _equipmentCtrl.text.isEmpty
+            ? 'Unknown Brewer'
+            : _equipmentCtrl.text,
+        defaultDose:
+            double.tryParse(_doseCtrl.text.replaceAll(',', '.')) ?? 15.0,
+        defaultWater:
+            double.tryParse(_waterCtrl.text.replaceAll(',', '.')) ?? 250.0,
         steps: _steps,
       );
 
@@ -50,7 +63,6 @@ class _AddMethodScreenState extends ConsumerState<AddMethodScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Calculate total time visually
     final totalSecs = _steps.fold(0, (sum, s) => sum + s.durationSeconds);
     final min = (totalSecs ~/ 60).toString().padLeft(2, '0');
     final sec = (totalSecs % 60).toString().padLeft(2, '0');
@@ -82,33 +94,88 @@ class _AddMethodScreenState extends ConsumerState<AddMethodScreen> {
             ),
             const SizedBox(height: 12),
 
-            // Name Input
             _buildInputField(
-              label: 'Recipe Name (e.g. Hoffmann V60)',
+              controller: _nameCtrl,
+              label: 'Recipe Name (e.g. The Devil\'s Recipe)',
               validator: (v) => v!.isEmpty ? 'Required' : null,
-              onSaved: (v) => _methodName = v!,
             ),
             const SizedBox(height: 16),
 
-            // Default Ratios
             Row(
               children: [
                 Expanded(
-                  child: _buildInputField(
-                    label: 'Coffee Dose (g)',
-                    initial: '15',
-                    isNumber: true,
-                    onSaved: (v) => _defaultDose = double.tryParse(v!) ?? 15.0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: CoffeeColors.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButtonFormField<String>(
+                        value: _brewType,
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                        ),
+                        icon: const Icon(
+                          Icons.keyboard_arrow_down,
+                          color: CoffeeColors.primary,
+                        ),
+                        style: GoogleFonts.inter(
+                          color: CoffeeColors.textDark,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        items:
+                            [
+                                  'Pour-over',
+                                  'Espresso',
+                                  'Moka Pot',
+                                  'French Press',
+                                  'Aeropress',
+                                ]
+                                .map(
+                                  (m) => DropdownMenuItem(
+                                    value: m,
+                                    child: Text(m),
+                                  ),
+                                )
+                                .toList(),
+                        onChanged: (value) =>
+                            setState(() => _brewType = value!),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: _buildInputField(
-                    label: 'Target Water (g)',
-                    initial: '250',
+                    controller: _equipmentCtrl,
+                    label: 'Brewer (e.g. V60)',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            Row(
+              children: [
+                Expanded(
+                  child: _buildInputField(
+                    controller: _doseCtrl,
+                    label: 'Coffee Dose (g)',
                     isNumber: true,
-                    onSaved: (v) =>
-                        _defaultWater = double.tryParse(v!) ?? 250.0,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildInputField(
+                    controller: _waterCtrl,
+                    label: 'Target Water (g)',
+                    isNumber: true,
                   ),
                 ),
               ],
@@ -138,7 +205,6 @@ class _AddMethodScreenState extends ConsumerState<AddMethodScreen> {
             ),
             const SizedBox(height: 16),
 
-            // The Step List
             if (_steps.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 32),
@@ -158,17 +224,15 @@ class _AddMethodScreenState extends ConsumerState<AddMethodScreen> {
 
             const SizedBox(height: 24),
 
-            // Add Step Button
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                side: const BorderSide(color: CoffeeColors.primary),
+                side: const BorderSide(color: CoffeeColors.primary, width: 1.5),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              onPressed: () =>
-                  _showStepBuilderModal(), // Opens our Dynamic Modal!
+              onPressed: () => _showStepBuilderModal(),
               icon: const Icon(Icons.add, color: CoffeeColors.primary),
               label: Text(
                 'Add New Step',
@@ -185,11 +249,11 @@ class _AddMethodScreenState extends ConsumerState<AddMethodScreen> {
     );
   }
 
-  // --- UI HELPER: A single Step Card ---
   Widget _buildStepCard(MethodStep step, int index) {
     IconData stepIcon = Icons.water_drop;
     if (step.type == 'Wait') stepIcon = Icons.timer_outlined;
     if (step.type == 'Swirl') stepIcon = Icons.cyclone;
+    if (step.type == 'Bloom') stepIcon = Icons.filter_vintage;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -224,96 +288,64 @@ class _AddMethodScreenState extends ConsumerState<AddMethodScreen> {
     );
   }
 
-  // --- THE MAGIC: DYNAMIC STEP BUILDER MODAL ---
-  void _showStepBuilderModal() {
+void _showStepBuilderModal() {
     String selectedType = 'Pour';
     final waterCtrl = TextEditingController();
     final timeCtrl = TextEditingController();
+    final notesCtrl = TextEditingController(); // NEW: Notes controller
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (context) {
         return StatefulBuilder(
-          // StatefulBuilder allows the modal to update its UI when icons are tapped!
           builder: (BuildContext context, StateSetter setModalState) {
-            bool needsWater =
-                (selectedType == 'Pour' || selectedType == 'Bloom');
+            bool needsWater = (selectedType == 'Pour' || selectedType == 'Bloom');
 
             return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-                left: 24,
-                right: 24,
-                top: 24,
-              ),
+              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 24, right: 24, top: 24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Add Process Step',
-                    style: GoogleFonts.montserrat(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  Text('Add Process Step', style: GoogleFonts.montserrat(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 24),
-
-                  // Icon Selector Row
+                  
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _buildTypeSelector(
-                        'Pour',
-                        Icons.water_drop,
-                        selectedType,
-                        () => setModalState(() => selectedType = 'Pour'),
-                      ),
-                      _buildTypeSelector(
-                        'Bloom',
-                        Icons.filter_vintage,
-                        selectedType,
-                        () => setModalState(() => selectedType = 'Bloom'),
-                      ),
-                      _buildTypeSelector(
-                        'Wait',
-                        Icons.timer_outlined,
-                        selectedType,
-                        () => setModalState(() => selectedType = 'Wait'),
-                      ),
-                      _buildTypeSelector(
-                        'Swirl',
-                        Icons.cyclone,
-                        selectedType,
-                        () => setModalState(() => selectedType = 'Swirl'),
-                      ),
+                      _buildTypeSelector('Pour', Icons.water_drop, selectedType, () => setModalState(() => selectedType = 'Pour')),
+                      _buildTypeSelector('Bloom', Icons.filter_vintage, selectedType, () => setModalState(() => selectedType = 'Bloom')),
+                      _buildTypeSelector('Wait', Icons.timer_outlined, selectedType, () => setModalState(() => selectedType = 'Wait')),
+                      _buildTypeSelector('Swirl', Icons.cyclone, selectedType, () => setModalState(() => selectedType = 'Swirl')),
                     ],
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
 
-                  // Dynamic Inputs
                   if (needsWater) ...[
                     TextField(
                       controller: waterCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Water Amount (g)',
-                        border: UnderlineInputBorder(),
-                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(labelText: 'Water Amount (g)', border: UnderlineInputBorder()),
                     ),
                     const SizedBox(height: 16),
                   ],
-
+                  
                   TextField(
                     controller: timeCtrl,
-                    keyboardType: TextInputType.number,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: 'Duration (seconds)', border: UnderlineInputBorder()),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // NEW: Instruction / Step Notes Field
+                  TextField(
+                    controller: notesCtrl,
                     decoration: const InputDecoration(
-                      labelText: 'Duration (seconds)',
+                      labelText: 'Step Instruction (Optional)',
+                      hintText: 'e.g. Pour in concentric circles',
                       border: UnderlineInputBorder(),
                     ),
                   ),
@@ -322,38 +354,26 @@ class _AddMethodScreenState extends ConsumerState<AddMethodScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: CoffeeColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
+                      style: ElevatedButton.styleFrom(backgroundColor: CoffeeColors.primary, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 16)),
                       onPressed: () {
                         setState(() {
-                          _steps.add(
-                            MethodStep(
-                              type: selectedType,
-                              waterAmount: needsWater
-                                  ? (double.tryParse(waterCtrl.text) ?? 0.0)
-                                  : 0.0,
-                              durationSeconds: int.tryParse(timeCtrl.text) ?? 0,
-                            ),
-                          );
+                          _steps.add(MethodStep(
+                            type: selectedType,
+                            waterAmount: needsWater ? (double.tryParse(waterCtrl.text.replaceAll(',', '.')) ?? 0.0) : 0.0,
+                            durationSeconds: int.tryParse(timeCtrl.text) ?? 0,
+                            notes: notesCtrl.text, // Saved to step!
+                          ));
                         });
                         Navigator.pop(context);
                       },
-                      child: Text(
-                        'Add to Recipe',
-                        style: GoogleFonts.montserrat(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      child: Text('Add to Recipe', style: GoogleFonts.montserrat(fontWeight: FontWeight.bold)),
                     ),
                   ),
                   const SizedBox(height: 24),
                 ],
               ),
             );
-          },
+          }
         );
       },
     );
@@ -395,11 +415,10 @@ class _AddMethodScreenState extends ConsumerState<AddMethodScreen> {
   }
 
   Widget _buildInputField({
+    required TextEditingController controller,
     required String label,
-    String? initial,
     bool isNumber = false,
     String? Function(String?)? validator,
-    void Function(String?)? onSaved,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -408,20 +427,28 @@ class _AddMethodScreenState extends ConsumerState<AddMethodScreen> {
         border: Border.all(color: Colors.grey.shade200),
       ),
       child: TextFormField(
-        initialValue: initial,
+        controller: controller, // Linked directly to our persistent controller!
         keyboardType: isNumber
             ? const TextInputType.numberWithOptions(decimal: true)
             : TextInputType.text,
+        style: GoogleFonts.inter(
+          color: CoffeeColors.textDark,
+          fontWeight: FontWeight.w600,
+          fontSize: 14,
+        ),
         decoration: InputDecoration(
           labelText: label,
+          labelStyle: GoogleFonts.inter(
+            fontSize: 12,
+            color: Colors.grey.shade500,
+          ),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
-            vertical: 12,
+            vertical: 8,
           ),
         ),
         validator: validator,
-        onSaved: onSaved,
       ),
     );
   }

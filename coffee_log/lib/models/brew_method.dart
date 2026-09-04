@@ -4,6 +4,7 @@ class BrewMethod {
   final int? id;
   final String methodName; // e.g., "Hoffmann V60 1-Cup"
   final String brewMethodType; // e.g., "Pour-over", "Espresso"
+  final String equipment; // NEW: e.g., "V60", "Solo Dripper"
   final double defaultDose; // Default target coffee (g)
   final double defaultWater; // Default target water (ml)
   final List<MethodStep> steps; // List of our customizable pour steps
@@ -12,6 +13,7 @@ class BrewMethod {
     this.id,
     required this.methodName,
     required this.brewMethodType,
+    required this.equipment, // NEW
     required this.defaultDose,
     required this.defaultWater,
     required this.steps,
@@ -31,6 +33,7 @@ class BrewMethod {
       'id': id,
       'methodName': methodName,
       'brewMethodType': brewMethodType,
+      'equipment': equipment, // NEW
       'defaultDose': defaultDose,
       'defaultWater': defaultWater,
       'stepsJson': jsonEncode(steps.map((s) => s.toMap()).toList()),
@@ -48,6 +51,9 @@ class BrewMethod {
       id: map['id'] as int?,
       methodName: map['methodName'] as String,
       brewMethodType: map['brewMethodType'] as String,
+      equipment:
+          map['equipment'] as String? ??
+          'Unknown Brewer', // NEW (with safe fallback)
       defaultDose: (map['defaultDose'] as num).toDouble(),
       defaultWater: (map['defaultWater'] as num).toDouble(),
       steps: stepsList,

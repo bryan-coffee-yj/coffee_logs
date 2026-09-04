@@ -20,6 +20,9 @@ class MethodDetailScreen extends StatelessWidget {
       '0',
     );
 
+    // This tracks the cumulative total for your scale!
+    double cumulativeWater = 0.0;
+
     return Scaffold(
       backgroundColor: CoffeeColors.background,
       appBar: AppBar(title: Text(method.methodName)),
@@ -50,7 +53,7 @@ class MethodDetailScreen extends StatelessWidget {
           const SizedBox(height: 32),
 
           Text(
-            'POUR STRUCTURE',
+            'POUR STRUCTURE (SCALE TOTALS)',
             style: GoogleFonts.montserrat(
               fontSize: 12,
               fontWeight: FontWeight.bold,
@@ -60,11 +63,14 @@ class MethodDetailScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // --- VISUAL TIMELINE ---
+          // --- VISUAL TIMELINE WITH CUMULATIVE MATH ---
           ...method.steps.asMap().entries.map((entry) {
             int index = entry.key;
             MethodStep step = entry.value;
             bool isLast = index == method.steps.length - 1;
+
+            // Barista Math: Add this step's water to the running total
+            cumulativeWater += step.waterAmount;
 
             IconData stepIcon = Icons.water_drop;
             if (step.type == 'Wait') stepIcon = Icons.timer_outlined;
@@ -80,7 +86,9 @@ class MethodDetailScreen extends StatelessWidget {
                     children: [
                       CircleAvatar(
                         radius: 16,
-                        backgroundColor: CoffeeColors.primary.withOpacity(0.1),
+                        backgroundColor: CoffeeColors.primary.withValues(
+                          alpha: 0.1,
+                        ),
                         child: Icon(
                           stepIcon,
                           size: 16,
@@ -105,24 +113,71 @@ class MethodDetailScreen extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            step.type,
-                            style: GoogleFonts.montserrat(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: CoffeeColors.textDark,
-                            ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                step.type,
+                                style: GoogleFonts.montserrat(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: CoffeeColors.textDark,
+                                ),
+                              ),
+                              Text(
+                                '${step.durationSeconds}s',
+                                style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey.shade500,
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 4),
-                          Text(
-                            step.waterAmount > 0
-                                ? 'Pour ${step.waterAmount}g  •  Wait ${step.durationSeconds}s'
-                                : 'Wait ${step.durationSeconds}s',
-                            style: GoogleFonts.inter(
-                              color: Colors.grey.shade600,
-                              fontSize: 14,
+
+                          if (step.waterAmount > 0)
+                            RichText(
+                              text: TextSpan(
+                                style: GoogleFonts.inter(
+                                  color: Colors.grey.shade600,
+                                  fontSize: 14,
+                                ),
+                                children: [
+                                  TextSpan(
+                                    text: 'Pour ${step.waterAmount}g  ➔  ',
+                                  ),
+                                  TextSpan(
+                                    text: 'Scale: ${cumulativeWater}g',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: CoffeeColors.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else
+                            Text(
+                              'No pouring required',
+                              style: GoogleFonts.inter(
+                                color: Colors.grey.shade400,
+                                fontSize: 14,
+                                fontStyle: FontStyle.italic,
+                              ),
                             ),
-                          ),
+
+                          // NEW: Display your custom instructions right below the scale total!
+                          if (step.notes.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              step.notes,
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: Colors.grey.shade500,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
