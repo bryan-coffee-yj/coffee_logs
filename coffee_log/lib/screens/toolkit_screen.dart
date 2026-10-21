@@ -19,13 +19,26 @@ class ToolkitScreen extends ConsumerStatefulWidget {
 class _ToolkitScreenState extends ConsumerState<ToolkitScreen> {
   int _selectedTab = 0; // 0 = Ratio Calculator, 1 = Stats & Insights
 
-  // Calculator State
+  // --- STANDALONE RATIO CALCULATOR STATE ---
+  double _standaloneDose = 15.0;
+  double _standaloneRatio = 16.7;
+  final _standaloneDoseCtrl = TextEditingController(text: '15.0');
+  final _standaloneRatioCtrl = TextEditingController(text: '16.7');
+  final List<double> _ratioPresets = [14.0, 15.0, 16.0, 16.7, 17.0, 18.0];
+
+  // --- RECIPE SCALER STATE ---
   BrewMethod? _selectedMethod;
   final _doseCtrl = TextEditingController(text: '15.0');
   double _customDose = 15.0;
 
+  // --- STATS DASHBOARD STATE ---
+  String _currency = 'RM';
+  final List<String> _currencyOptions = ['RM', '\$', '€', '£', '¥', 'CHF', 'kr'];
+
   @override
   void dispose() {
+    _standaloneDoseCtrl.dispose();
+    _standaloneRatioCtrl.dispose();
     _doseCtrl.dispose();
     super.dispose();
   }
@@ -52,7 +65,7 @@ class _ToolkitScreenState extends ConsumerState<ToolkitScreen> {
                 ),
                 child: Row(
                   children: [
-                    Expanded(child: _buildSegmentButton('Ratio Scaler', 0)),
+                    Expanded(child: _buildSegmentButton('Ratio Calculator', 0)),
                     Expanded(child: _buildSegmentButton('Stats & Insights', 1)),
                   ],
                 ),
@@ -63,7 +76,7 @@ class _ToolkitScreenState extends ConsumerState<ToolkitScreen> {
             // --- TAB CONTENT ---
             Expanded(
               child: _selectedTab == 0
-                  ? _buildRatioCalculator(methodState)
+                  ? _buildRatioTab(methodState)
                   : _buildStatsDashboard(),
             ),
           ],
@@ -106,8 +119,255 @@ class _ToolkitScreenState extends ConsumerState<ToolkitScreen> {
     );
   }
 
-  // --- SECTION 1: RATIO CALCULATOR ---
-  Widget _buildRatioCalculator(AsyncValue<List<BrewMethod>> methodState) {
+  // --- SECTION 1: RATIO CALCULATOR TAB ---
+  Widget _buildRatioTab(AsyncValue<List<BrewMethod>> methodState) {
+    final double calculatedWater = _standaloneDose * _standaloneRatio;
+
+    return ListView(
+      padding: const EdgeInsets.only(left: 16, right: 16, bottom: 120),
+      children: [
+        // 1. STANDALONE QUICK RATIO CALCULATOR
+        Text(
+          'FLEXIBLE RATIO CALCULATOR',
+          style: GoogleFonts.montserrat(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: CoffeeColors.accent,
+            letterSpacing: 1.5,
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200, width: 1.5),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Ratio Presets Chips
+              Text(
+                'PRESET RATIOS',
+                style: GoogleFonts.inter(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade500,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _ratioPresets.map((r) {
+                  bool isSelected = (_standaloneRatio - r).abs() < 0.05;
+                  return ChoiceChip(
+                    label: Text('1:${r == r.roundToDouble() ? r.toInt() : r}'),
+                    selected: isSelected,
+                    selectedColor: CoffeeColors.primary,
+                    backgroundColor: CoffeeColors.surface,
+                    labelStyle: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected ? Colors.white : CoffeeColors.textDark,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(
+                        color: isSelected
+                            ? CoffeeColors.primary
+                            : Colors.grey.shade300,
+                      ),
+                    ),
+                    onSelected: (selected) {
+                      if (selected) {
+                        setState(() {
+                          _standaloneRatio = r;
+                          _standaloneRatioCtrl.text = r.toString();
+                        });
+                      }
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 20),
+
+              // Inputs: Dose & Custom Ratio
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: CoffeeColors.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'COFFEE DOSE',
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: CoffeeColors.accent,
+                            ),
+                          ),
+                          TextField(
+                            controller: _standaloneDoseCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            style: GoogleFonts.montserrat(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: CoffeeColors.textDark,
+                            ),
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              border: InputBorder.none,
+                              suffixText: 'g',
+                            ),
+                            onChanged: (v) {
+                              setState(() {
+                                _standaloneDose =
+                                    double.tryParse(v.replaceAll(',', '.')) ??
+                                    0.0;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: CoffeeColors.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'RATIO (1:X)',
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: CoffeeColors.accent,
+                            ),
+                          ),
+                          TextField(
+                            controller: _standaloneRatioCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            style: GoogleFonts.montserrat(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: CoffeeColors.textDark,
+                            ),
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              border: InputBorder.none,
+                              prefixText: '1:',
+                            ),
+                            onChanged: (v) {
+                              setState(() {
+                                _standaloneRatio =
+                                    double.tryParse(v.replaceAll(',', '.')) ??
+                                    16.0;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Result Banner
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: CoffeeColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: CoffeeColors.primary.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'TOTAL WATER REQUIRED',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: CoffeeColors.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${calculatedWater.toStringAsFixed(1)} g / ml',
+                          style: GoogleFonts.montserrat(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: CoffeeColors.textDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Icon(
+                      Icons.water_drop,
+                      size: 32,
+                      color: Colors.blue.shade600,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 32),
+
+        // 2. RECIPE-BASED STEP SCALER
+        Text(
+          'RECIPE STEP-BY-STEP SCALER',
+          style: GoogleFonts.montserrat(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: CoffeeColors.accent,
+            letterSpacing: 1.5,
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        _buildRecipeStepScaler(methodState),
+      ],
+    );
+  }
+
+  Widget _buildRecipeStepScaler(AsyncValue<List<BrewMethod>> methodState) {
     return methodState.when(
       loading: () => const Center(
         child: CircularProgressIndicator(color: CoffeeColors.primary),
@@ -115,22 +375,32 @@ class _ToolkitScreenState extends ConsumerState<ToolkitScreen> {
       error: (e, s) => Center(child: Text('Error: $e')),
       data: (methods) {
         if (methods.isEmpty) {
-          return Center(
-            child: Text(
-              'Create a recipe in the Methods tab first to use the scaler!',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(color: Colors.grey.shade500),
+          return Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Center(
+              child: Text(
+                'No saved recipes found.\nAdd recipes in the Method tab to scale step-by-step pours!',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(color: Colors.grey.shade500),
+              ),
             ),
           );
         }
 
         _selectedMethod ??= methods.first;
-        final scaleFactor = _customDose / _selectedMethod!.defaultDose;
+        final scaleFactor = _selectedMethod!.defaultDose > 0
+            ? _customDose / _selectedMethod!.defaultDose
+            : 1.0;
         final totalScaledWater = _selectedMethod!.defaultWater * scaleFactor;
         double cumulativeWater = 0.0;
 
-        return ListView(
-          padding: const EdgeInsets.only(left: 16, right: 16, bottom: 120),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Recipe Dropdown
             Container(
@@ -242,18 +512,7 @@ class _ToolkitScreenState extends ConsumerState<ToolkitScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
-
-            Text(
-              'SCALED SCALE TARGETS',
-              style: GoogleFonts.montserrat(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: CoffeeColors.accent,
-                letterSpacing: 1.5,
-              ),
-            ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
 
             // Scaled Steps Table
             ..._selectedMethod!.steps.map((step) {
@@ -316,10 +575,11 @@ class _ToolkitScreenState extends ConsumerState<ToolkitScreen> {
         DatabaseHelper.instance.getAllBrewLogs(),
       ]),
       builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
-        if (!snapshot.hasData)
+        if (!snapshot.hasData) {
           return const Center(
             child: CircularProgressIndicator(color: CoffeeColors.primary),
           );
+        }
 
         final List<CoffeeBean> beans = snapshot.data![0] as List<CoffeeBean>;
         final List<BrewLog> logs = snapshot.data![1] as List<BrewLog>;
@@ -333,12 +593,60 @@ class _ToolkitScreenState extends ConsumerState<ToolkitScreen> {
         return ListView(
           padding: const EdgeInsets.only(left: 16, right: 16, bottom: 120),
           children: [
+            // Currency Selector Row
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Currency Display: $_currency',
+                    style: GoogleFonts.montserrat(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: CoffeeColors.textDark,
+                    ),
+                  ),
+                  TextButton.icon(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    onPressed: _showCurrencyPicker,
+                    icon: const Icon(
+                      Icons.currency_exchange,
+                      size: 16,
+                      color: CoffeeColors.primary,
+                    ),
+                    label: Text(
+                      'Change',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: CoffeeColors.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
             Row(
               children: [
                 Expanded(
                   child: _buildStatCard(
                     'Total Spent',
-                    'RM ${totalSpent.toStringAsFixed(2)}',
+                    '$_currency ${totalSpent.toStringAsFixed(2)}',
                     Icons.payments_outlined,
                     Colors.green.shade600,
                   ),
@@ -369,7 +677,7 @@ class _ToolkitScreenState extends ConsumerState<ToolkitScreen> {
                 Expanded(
                   child: _buildStatCard(
                     'Avg / Cup',
-                    'RM ${avgCostPerCup.toStringAsFixed(2)}',
+                    '$_currency ${avgCostPerCup.toStringAsFixed(2)}',
                     Icons.local_cafe_outlined,
                     Colors.deepOrange.shade400,
                   ),
@@ -377,6 +685,45 @@ class _ToolkitScreenState extends ConsumerState<ToolkitScreen> {
               ],
             ),
           ],
+        );
+      },
+    );
+  }
+
+  void _showCurrencyPicker() {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return SimpleDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            'Select Currency',
+            style: GoogleFonts.montserrat(fontWeight: FontWeight.bold),
+          ),
+          children: _currencyOptions.map((c) {
+            return SimpleDialogOption(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              onPressed: () {
+                setState(() => _currency = c);
+                Navigator.pop(ctx);
+              },
+              child: Text(
+                c,
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  fontWeight:
+                      _currency == c ? FontWeight.bold : FontWeight.normal,
+                  color:
+                      _currency == c
+                          ? CoffeeColors.primary
+                          : CoffeeColors.textDark,
+                ),
+              ),
+            );
+          }).toList(),
         );
       },
     );

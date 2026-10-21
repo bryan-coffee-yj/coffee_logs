@@ -110,7 +110,7 @@ class _AddBeanScreenState extends ConsumerState<AddBeanScreen> {
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButtonFormField<String>(
-                  value: _roastLevel,
+                  initialValue: _roastLevel,
                   decoration: const InputDecoration(border: InputBorder.none),
                   icon: const Icon(
                     Icons.keyboard_arrow_down,

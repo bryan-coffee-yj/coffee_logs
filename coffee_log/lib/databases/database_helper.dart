@@ -131,6 +131,19 @@ class DatabaseHelper {
     return result.map((json) => CoffeeBean.fromMap(json)).toList();
   }
 
+  // Get single coffee bean by ID
+  Future<CoffeeBean?> getCoffeeBeanById(int id) async {
+    final db = await instance.database;
+    final result = await db.query(
+      'coffee_beans',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (result.isNotEmpty) return CoffeeBean.fromMap(result.first);
+    return null;
+  }
+
   Future<int> updateCoffeeBean(CoffeeBean bean) async {
     final db = await instance.database;
     return await db.update(
@@ -213,6 +226,28 @@ class DatabaseHelper {
     );
     if (result.isNotEmpty) return BrewLog.fromMap(result.first);
     return null;
+  }
+
+  Future<BrewLog?> getBrewLogById(int id) async {
+    final db = await instance.database;
+    final result = await db.query(
+      'brew_logs',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (result.isNotEmpty) return BrewLog.fromMap(result.first);
+    return null;
+  }
+
+  Future<int> updateBrewLog(BrewLog log) async {
+    final db = await instance.database;
+    return await db.update(
+      'brew_logs',
+      log.toMap(),
+      where: 'id = ?',
+      whereArgs: [log.id],
+    );
   }
 
   Future<int> deleteBrewLog(int id) async {

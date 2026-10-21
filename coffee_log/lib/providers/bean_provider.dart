@@ -58,6 +58,32 @@ class ArchiveNotifier extends AsyncNotifier<List<CoffeeBean>> {
       return await DatabaseHelper.instance.getArchivedCoffeeBeans();
     });
   }
+
+  Future<void> unarchiveBean(CoffeeBean bean, double restoredWeight) async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      final restoredBean = CoffeeBean(
+        id: bean.id,
+        roasterName: bean.roasterName,
+        beanName: bean.beanName,
+        roastLevel: bean.roastLevel,
+        process: bean.process,
+        roastDate: bean.roastDate,
+        price: bean.price,
+        initialWeight: bean.initialWeight,
+        currentWeight: restoredWeight,
+        isArchived: false,
+        archiveStatus: null,
+        archiveNotes: bean.archiveNotes,
+      );
+      await DatabaseHelper.instance.updateCoffeeBean(restoredBean);
+
+      // Refresh the active stash so the restored bean appears immediately
+      ref.invalidate(beanProvider);
+
+      return await DatabaseHelper.instance.getArchivedCoffeeBeans();
+    });
+  }
 }
 
 // Global provider for Archived Beans
@@ -65,3 +91,11 @@ final archiveProvider =
     AsyncNotifierProvider<ArchiveNotifier, List<CoffeeBean>>(() {
       return ArchiveNotifier();
     });
+
+// --- 3. ALL BEANS PROVIDER (Combines Active & Archived for Timeline Lookup) ---
+final allBeansProvider = FutureProvider<List<CoffeeBean>>((ref) async {
+  // Automatically re-evaluates whenever active stash or archive changes
+  ref.watch(beanProvider);
+  ref.watch(archiveProvider);
+  return await DatabaseHelper.instance.getAllCoffeeBeans();
+});
