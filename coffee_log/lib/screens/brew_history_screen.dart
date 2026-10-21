@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../models/coffee_bean.dart';
 import '../providers/brew_log_provider.dart';
+import '../providers/bean_provider.dart';
 import 'add_brew_screen.dart';
 import '../main.dart'; // To access CoffeeColors
 
@@ -16,6 +17,12 @@ class BrewHistoryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final logsState = ref.watch(brewLogProvider(bean.id!));
+    // Watch beanProvider to keep remaining weight live after edits/refunds
+    final activeBeans = ref.watch(beanProvider);
+    final currentBean = activeBeans.maybeWhen(
+      data: (beans) => beans.firstWhere((b) => b.id == bean.id, orElse: () => bean),
+      orElse: () => bean,
+    );
 
     return Scaffold(
       backgroundColor: CoffeeColors.background,
@@ -23,14 +30,14 @@ class BrewHistoryScreen extends ConsumerWidget {
         title: Column(
           children: [
             Text(
-              bean.beanName,
+              currentBean.beanName,
               style: GoogleFonts.montserrat(
                 fontWeight: FontWeight.bold,
                 fontSize: 18,
               ),
             ),
             Text(
-              'Remaining: ${bean.currentWeight}g',
+              'Remaining: ${currentBean.currentWeight.toStringAsFixed(1)}g',
               style: GoogleFonts.inter(
                 fontSize: 12,
                 color: CoffeeColors.primary,
@@ -38,6 +45,14 @@ class BrewHistoryScreen extends ConsumerWidget {
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.tune, color: CoffeeColors.primary, size: 20),
+            tooltip: 'Adjust Weight',
+            onPressed: () => _showWeightAdjustModal(context, ref, currentBean),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: logsState.when(
         loading: () => const Center(
@@ -204,18 +219,107 @@ class BrewHistoryScreen extends ConsumerWidget {
                       ),
                     ],
 
-                    // Delete Button
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: IconButton(
-                        icon: const Icon(
-                          Icons.delete_outline,
-                          color: Colors.redAccent,
-                          size: 20,
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        // Repeat this exact brew
+                        TextButton.icon(
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => AddBrewScreen(
+                                  bean: currentBean,
+                                  repeatFromLog: log,
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(
+                            Icons.replay,
+                            color: CoffeeColors.primary,
+                            size: 16,
+                          ),
+                          label: Text(
+                            'Repeat',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: CoffeeColors.primary,
+                            ),
+                          ),
                         ),
-                        onPressed: () =>
-                            BrewLogController.deleteLog(ref, log.id!, bean.id!),
-                      ),
+                        const SizedBox(width: 8),
+
+                        // Edit this brew log
+                        TextButton.icon(
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => AddBrewScreen(
+                                  bean: currentBean,
+                                  existingLog: log,
+                                ),
+                              ),
+                            );
+                          },
+                          icon: Icon(
+                            Icons.edit_outlined,
+                            color: Colors.grey.shade700,
+                            size: 16,
+                          ),
+                          label: Text(
+                            'Edit',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+
+                        // Delete this brew log
+                        IconButton(
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: Colors.redAccent,
+                            size: 18,
+                          ),
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.all(6),
+                          tooltip: 'Delete Brew',
+                          onPressed: () async {
+                            final double doseRefunded = log.dose;
+                            await BrewLogController.deleteLog(
+                              ref,
+                              log.id!,
+                              currentBean.id!,
+                            );
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Deleted brew. ${doseRefunded}g refunded to ${currentBean.beanName}!',
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -233,7 +337,9 @@ class BrewHistoryScreen extends ConsumerWidget {
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => AddBrewScreen(bean: bean)),
+            MaterialPageRoute(
+              builder: (context) => AddBrewScreen(bean: currentBean),
+            ),
           );
         },
         icon: const Icon(Icons.add),
@@ -251,7 +357,7 @@ class BrewHistoryScreen extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: color.withOpacity(0.4)),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
@@ -268,6 +374,211 @@ class BrewHistoryScreen extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showWeightAdjustModal(
+    BuildContext context,
+    WidgetRef ref,
+    CoffeeBean bean,
+  ) {
+    final TextEditingController weightCtrl = TextEditingController(
+      text: bean.currentWeight.toStringAsFixed(1),
+    );
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+                left: 24,
+                right: 24,
+                top: 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Adjust Remaining Weight',
+                    style: GoogleFonts.montserrat(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: CoffeeColors.textDark,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    bean.beanName,
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Quick Purge / Adjustment chips
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildPurgeChip(
+                        '-2g Purge',
+                        () {
+                          double cur =
+                              double.tryParse(
+                                weightCtrl.text.replaceAll(',', '.'),
+                              ) ??
+                              bean.currentWeight;
+                          double next = (cur - 2.0).clamp(0.0, double.infinity);
+                          setModalState(
+                            () => weightCtrl.text = next.toStringAsFixed(1),
+                          );
+                        },
+                      ),
+                      _buildPurgeChip(
+                        '-5g Purge',
+                        () {
+                          double cur =
+                              double.tryParse(
+                                weightCtrl.text.replaceAll(',', '.'),
+                              ) ??
+                              bean.currentWeight;
+                          double next = (cur - 5.0).clamp(0.0, double.infinity);
+                          setModalState(
+                            () => weightCtrl.text = next.toStringAsFixed(1),
+                          );
+                        },
+                      ),
+                      _buildPurgeChip(
+                        '+5g Add',
+                        () {
+                          double cur =
+                              double.tryParse(
+                                weightCtrl.text.replaceAll(',', '.'),
+                              ) ??
+                              bean.currentWeight;
+                          double next = cur + 5.0;
+                          setModalState(
+                            () => weightCtrl.text = next.toStringAsFixed(1),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Text field for exact weight
+                  TextField(
+                    controller: weightCtrl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    style: GoogleFonts.montserrat(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: CoffeeColors.primary,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'Remaining Weight (g)',
+                      labelStyle: GoogleFonts.inter(
+                        color: Colors.grey.shade500,
+                      ),
+                      border: const UnderlineInputBorder(),
+                      suffixText: 'g',
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: CoffeeColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () {
+                        final double newWeight =
+                            double.tryParse(
+                              weightCtrl.text.replaceAll(',', '.'),
+                            ) ??
+                            bean.currentWeight;
+
+                        final updatedBean = CoffeeBean(
+                          id: bean.id,
+                          roasterName: bean.roasterName,
+                          beanName: bean.beanName,
+                          roastLevel: bean.roastLevel,
+                          process: bean.process,
+                          roastDate: bean.roastDate,
+                          price: bean.price,
+                          initialWeight: bean.initialWeight,
+                          currentWeight: newWeight,
+                          isArchived: bean.isArchived,
+                          archiveStatus: bean.archiveStatus,
+                          archiveNotes: bean.archiveNotes,
+                        );
+
+                        ref.read(beanProvider.notifier).updateBean(updatedBean);
+                        Navigator.pop(ctx);
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              '${bean.beanName} updated to ${newWeight.toStringAsFixed(1)}g',
+                            ),
+                          ),
+                        );
+                      },
+                      child: Text(
+                        'Save Weight',
+                        style: GoogleFonts.montserrat(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildPurgeChip(String label, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: CoffeeColors.surface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: CoffeeColors.textDark,
+          ),
+        ),
       ),
     );
   }

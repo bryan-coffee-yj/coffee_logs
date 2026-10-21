@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
 
 import '../models/coffee_bean.dart';
 import '../providers/bean_provider.dart';
 import 'add_bean_screen.dart';
+import 'add_brew_screen.dart';
 import 'brew_history_screen.dart';
 import '../main.dart'; // Access CoffeeColors
 import '../databases/database_helper.dart';
@@ -126,7 +126,7 @@ class _BeanListScreenState extends ConsumerState<BeanListScreen> {
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -296,6 +296,126 @@ class _BeanListScreenState extends ConsumerState<BeanListScreen> {
                               : Colors.redAccent,
                         ),
                       ),
+                      if (bean.currentWeight <= 0) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.red.shade200),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.inventory_2_outlined,
+                                size: 16,
+                                color: Colors.red.shade700,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Bag is empty! Archive it to finish history.',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: Colors.red.shade800,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              TextButton(
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                onPressed: () =>
+                                    _showArchiveDialog(context, ref, bean),
+                                child: Text(
+                                  'Archive',
+                                  style: GoogleFonts.inter(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red.shade700,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 10,
+                                ),
+                                side: BorderSide(
+                                  color: CoffeeColors.primary.withValues(
+                                    alpha: 0.3,
+                                  ),
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              onPressed: () => _repeatLastBrew(context, bean),
+                              icon: const Icon(
+                                Icons.replay,
+                                size: 16,
+                                color: CoffeeColors.primary,
+                              ),
+                              label: Text(
+                                'Brew Again',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: CoffeeColors.primary,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
+                              side: BorderSide(
+                                color: Colors.grey.shade300,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            onPressed: () =>
+                                _showWeightAdjustModal(context, ref, bean),
+                            icon: Icon(
+                              Icons.tune,
+                              size: 16,
+                              color: Colors.grey.shade700,
+                            ),
+                            label: Text(
+                              '+/- Weight',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -431,6 +551,43 @@ class _BeanListScreenState extends ConsumerState<BeanListScreen> {
                           ),
                         ),
                       ],
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              side: BorderSide(
+                                color: CoffeeColors.primary.withValues(
+                                  alpha: 0.4,
+                                ),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            onPressed: () =>
+                                _showUnarchiveDialog(context, ref, bean),
+                            icon: const Icon(
+                              Icons.unarchive_outlined,
+                              size: 16,
+                              color: CoffeeColors.primary,
+                            ),
+                            label: Text(
+                              'Restore to Stash',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: CoffeeColors.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -575,6 +732,100 @@ class _BeanListScreenState extends ConsumerState<BeanListScreen> {
     );
   }
 
+  // --- UI HELPER: Unarchive / Restore Dialog ---
+  void _showUnarchiveDialog(
+    BuildContext context,
+    WidgetRef ref,
+    CoffeeBean bean,
+  ) {
+    final defaultWeight = bean.initialWeight > 0 ? bean.initialWeight : 200.0;
+    final weightController = TextEditingController(
+      text: defaultWeight.toStringAsFixed(0),
+    );
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            'Restore to Stash?',
+            style: GoogleFonts.montserrat(fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Move "${bean.beanName}" back to your active coffee cellar.',
+                style: GoogleFonts.inter(
+                  color: Colors.grey.shade700,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: weightController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: InputDecoration(
+                  labelText: 'Available Weight (g)',
+                  labelStyle: GoogleFonts.inter(fontSize: 14),
+                  hintText: 'e.g. 200',
+                  suffixText: 'g',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.inter(
+                  color: Colors.grey,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                final weight =
+                    double.tryParse(weightController.text) ?? defaultWeight;
+                ref.read(archiveProvider.notifier).unarchiveBean(
+                      bean,
+                      weight > 0 ? weight : defaultWeight,
+                    );
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      '"${bean.beanName}" restored to active stash!',
+                    ),
+                  ),
+                );
+              },
+              child: Text(
+                'Restore',
+                style: GoogleFonts.inter(
+                  color: CoffeeColors.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildStatusButton(
     String value,
     IconData icon,
@@ -685,6 +936,226 @@ class _BeanListScreenState extends ConsumerState<BeanListScreen> {
           ],
         );
       },
+    );
+  }
+
+  void _repeatLastBrew(BuildContext context, CoffeeBean bean) async {
+    final latestLog =
+        await DatabaseHelper.instance.getLatestBrewLogForBean(bean.id!);
+    if (!context.mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddBrewScreen(
+          bean: bean,
+          repeatFromLog: latestLog,
+        ),
+      ),
+    );
+  }
+
+  void _showWeightAdjustModal(
+    BuildContext context,
+    WidgetRef ref,
+    CoffeeBean bean,
+  ) {
+    final TextEditingController weightCtrl = TextEditingController(
+      text: bean.currentWeight.toStringAsFixed(1),
+    );
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+                left: 24,
+                right: 24,
+                top: 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Adjust Remaining Weight',
+                    style: GoogleFonts.montserrat(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: CoffeeColors.textDark,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    bean.beanName,
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Quick Purge / Adjustment chips
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildPurgeChip(
+                        '-2g Purge',
+                        () {
+                          double cur =
+                              double.tryParse(
+                                weightCtrl.text.replaceAll(',', '.'),
+                              ) ??
+                              bean.currentWeight;
+                          double next = (cur - 2.0).clamp(0.0, double.infinity);
+                          setModalState(
+                            () => weightCtrl.text = next.toStringAsFixed(1),
+                          );
+                        },
+                      ),
+                      _buildPurgeChip(
+                        '-5g Purge',
+                        () {
+                          double cur =
+                              double.tryParse(
+                                weightCtrl.text.replaceAll(',', '.'),
+                              ) ??
+                              bean.currentWeight;
+                          double next = (cur - 5.0).clamp(0.0, double.infinity);
+                          setModalState(
+                            () => weightCtrl.text = next.toStringAsFixed(1),
+                          );
+                        },
+                      ),
+                      _buildPurgeChip(
+                        '+5g Add',
+                        () {
+                          double cur =
+                              double.tryParse(
+                                weightCtrl.text.replaceAll(',', '.'),
+                              ) ??
+                              bean.currentWeight;
+                          double next = cur + 5.0;
+                          setModalState(
+                            () => weightCtrl.text = next.toStringAsFixed(1),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Text field for exact weight
+                  TextField(
+                    controller: weightCtrl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    style: GoogleFonts.montserrat(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: CoffeeColors.primary,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'Remaining Weight (g)',
+                      labelStyle: GoogleFonts.inter(
+                        color: Colors.grey.shade500,
+                      ),
+                      border: const UnderlineInputBorder(),
+                      suffixText: 'g',
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: CoffeeColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () {
+                        final double newWeight =
+                            double.tryParse(
+                              weightCtrl.text.replaceAll(',', '.'),
+                            ) ??
+                            bean.currentWeight;
+
+                        final updatedBean = CoffeeBean(
+                          id: bean.id,
+                          roasterName: bean.roasterName,
+                          beanName: bean.beanName,
+                          roastLevel: bean.roastLevel,
+                          process: bean.process,
+                          roastDate: bean.roastDate,
+                          price: bean.price,
+                          initialWeight: bean.initialWeight,
+                          currentWeight: newWeight,
+                          isArchived: bean.isArchived,
+                          archiveStatus: bean.archiveStatus,
+                          archiveNotes: bean.archiveNotes,
+                        );
+
+                        ref.read(beanProvider.notifier).updateBean(updatedBean);
+                        Navigator.pop(ctx);
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              '${bean.beanName} updated to ${newWeight.toStringAsFixed(1)}g',
+                            ),
+                          ),
+                        );
+                      },
+                      child: Text(
+                        'Save Weight',
+                        style: GoogleFonts.montserrat(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildPurgeChip(String label, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: CoffeeColors.surface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: CoffeeColors.textDark,
+          ),
+        ),
+      ),
     );
   }
 }

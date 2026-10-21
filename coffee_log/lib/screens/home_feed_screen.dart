@@ -8,6 +8,7 @@ import '../providers/bean_provider.dart';
 import '../models/brew_log.dart';
 import '../models/coffee_bean.dart';
 import '../main.dart'; // Access CoffeeColors
+import 'add_brew_screen.dart';
 
 class HomeFeedScreen extends ConsumerWidget {
   const HomeFeedScreen({super.key});
@@ -15,7 +16,7 @@ class HomeFeedScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final feedState = ref.watch(homeFeedProvider);
-    final beanState = ref.watch(beanProvider);
+    final allBeansState = ref.watch(allBeansProvider);
 
     return Scaffold(
       backgroundColor:
@@ -50,9 +51,9 @@ class HomeFeedScreen extends ConsumerWidget {
             );
           }
 
-          // Get beans to map IDs to names
+          // Get beans to map IDs to names (both active and archived)
           List<CoffeeBean> beans = [];
-          beanState.whenData((bList) => beans = bList);
+          allBeansState.whenData((bList) => beans = bList);
           final beanMap = {for (var b in beans) b.id: b};
 
           return ListView.builder(
@@ -112,7 +113,7 @@ class _ExpandingFeedCardState extends State<_ExpandingFeedCard> {
         boxShadow: [
           if (_isExpanded)
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 15,
               offset: const Offset(0, 5),
             ),
@@ -143,13 +144,22 @@ class _ExpandingFeedCardState extends State<_ExpandingFeedCard> {
                         letterSpacing: 1.2,
                       ),
                     ),
-                    Text(
-                      DateFormat('dd MMM yyyy').format(widget.log.dateOfMaking),
-                      style: GoogleFonts.inter(
-                        color: Colors.grey.shade400,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (widget.bean?.isArchived == true) ...[
+                          _buildArchivedBadge(widget.bean?.archiveStatus),
+                          const SizedBox(width: 8),
+                        ],
+                        Text(
+                          DateFormat('dd MMM yyyy').format(widget.log.dateOfMaking),
+                          style: GoogleFonts.inter(
+                            color: Colors.grey.shade400,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -256,6 +266,86 @@ class _ExpandingFeedCardState extends State<_ExpandingFeedCard> {
                       ),
                     ),
                   ],
+
+                  if (widget.bean != null) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        if (!widget.bean!.isArchived) ...[
+                          TextButton.icon(
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => AddBrewScreen(
+                                    bean: widget.bean!,
+                                    repeatFromLog: widget.log,
+                                  ),
+                                ),
+                              );
+                            },
+                            icon: const Icon(
+                              Icons.replay,
+                              size: 14,
+                              color: CoffeeColors.primary,
+                            ),
+                            label: Text(
+                              'Repeat',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: CoffeeColors.primary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        TextButton.icon(
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => AddBrewScreen(
+                                  bean: widget.bean!,
+                                  existingLog: widget.log,
+                                ),
+                              ),
+                            );
+                          },
+                          icon: Icon(
+                            Icons.edit_outlined,
+                            size: 14,
+                            color: Colors.grey.shade700,
+                          ),
+                          label: Text(
+                            'Edit',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
 
                 // Subtle prompt indicator at the bottom
@@ -339,6 +429,38 @@ class _ExpandingFeedCardState extends State<_ExpandingFeedCard> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildArchivedBadge(String? status) {
+    Color bg = Colors.grey.shade100;
+    Color fg = Colors.grey.shade700;
+    String label = 'Archived';
+    if (status == 'best') {
+      bg = const Color(0xFFF0FDF4);
+      fg = Colors.green.shade700;
+      label = 'Archived • Best';
+    } else if (status == 'bad') {
+      bg = const Color(0xFFFEF2F2);
+      fg = Colors.red.shade700;
+      label = 'Archived • Bad';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: fg.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.inter(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: fg,
+        ),
       ),
     );
   }

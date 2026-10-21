@@ -116,7 +116,7 @@ class _AddMethodScreenState extends ConsumerState<AddMethodScreen> {
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButtonFormField<String>(
-                        value: _brewType,
+                        initialValue: _brewType,
                         decoration: const InputDecoration(
                           border: InputBorder.none,
                         ),

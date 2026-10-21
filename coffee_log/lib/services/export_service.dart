@@ -80,9 +80,12 @@ class ExportService {
       await file.writeAsString(csvString);
 
       // 6. Share the file
-      await Share.shareXFiles([
-        XFile(path),
-      ], text: 'Here is my exported coffee log backup!');
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(path)],
+          text: 'Here is my exported coffee log backup!',
+        ),
+      );
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(

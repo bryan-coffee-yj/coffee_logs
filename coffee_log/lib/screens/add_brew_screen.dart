@@ -14,7 +14,15 @@ import '../main.dart';
 
 class AddBrewScreen extends ConsumerStatefulWidget {
   final CoffeeBean bean;
-  const AddBrewScreen({super.key, required this.bean});
+  final BrewLog? existingLog;
+  final BrewLog? repeatFromLog;
+
+  const AddBrewScreen({
+    super.key,
+    required this.bean,
+    this.existingLog,
+    this.repeatFromLog,
+  });
 
   @override
   ConsumerState<AddBrewScreen> createState() => _AddBrewScreenState();
@@ -41,10 +49,46 @@ class _AddBrewScreenState extends ConsumerState<AddBrewScreen> {
   double _body = 3;
   final _notesCtrl = TextEditingController();
 
+  bool get _isEditing => widget.existingLog != null;
+
   @override
   void initState() {
     super.initState();
-    _loadPreviousBrew();
+    if (widget.existingLog != null) {
+      final log = widget.existingLog!;
+      _brewMethod = log.brewMethod;
+      _equipment = log.equipment;
+      _grinder = log.grinder;
+      _grindSize = log.grindSize;
+      _dose = log.dose;
+      _waterMass = log.waterMass;
+      _temperature = log.temperature;
+      _timeMin = log.brewTimeSeconds ~/ 60;
+      _timeSec = log.brewTimeSeconds % 60;
+      _acidity = log.acidityScore.toDouble();
+      _sweetness = log.sweetnessScore.toDouble();
+      _body = log.bodyScore.toDouble();
+      _notesCtrl.text = log.tastingNotes;
+      _isLoading = false;
+    } else if (widget.repeatFromLog != null) {
+      final log = widget.repeatFromLog!;
+      _brewMethod = log.brewMethod;
+      _equipment = log.equipment;
+      _grinder = log.grinder;
+      _grindSize = log.grindSize;
+      _dose = log.dose;
+      _waterMass = log.waterMass;
+      _temperature = log.temperature;
+      _timeMin = log.brewTimeSeconds ~/ 60;
+      _timeSec = log.brewTimeSeconds % 60;
+      _acidity = log.acidityScore.toDouble();
+      _sweetness = log.sweetnessScore.toDouble();
+      _body = log.bodyScore.toDouble();
+      _notesCtrl.text = log.tastingNotes;
+      _isLoading = false;
+    } else {
+      _loadPreviousBrew();
+    }
   }
 
   // Barista Quick-Log Logic
@@ -58,8 +102,6 @@ class _AddBrewScreenState extends ConsumerState<AddBrewScreen> {
         _equipment = lastLog.equipment;
         _grinder = lastLog.grinder;
         _grindSize = lastLog.grindSize;
-        // Notice we DO NOT load the previous dose/water here anymore,
-        // because you'll select a template instead!
       });
     }
     setState(() => _isLoading = false);
@@ -77,38 +119,81 @@ class _AddBrewScreenState extends ConsumerState<AddBrewScreen> {
   }
 
   void _saveBrew() async {
-    final newLog = BrewLog(
-      beanId: widget.bean.id!,
-      dateOfMaking: DateTime.now(),
-      brewMethod: _brewMethod,
-      appliedMethod:
-          _selectedMethod?.methodName, // <--- NEW: Grabs the template name!
-      equipment: _equipment,
-      grinder: _grinder,
-      grindSize: _grindSize,
-      dose: _dose,
-      waterMass: _waterMass,
-      temperature: _temperature,
-      brewTimeSeconds: (_timeMin * 60) + _timeSec,
-      acidityScore: _acidity.toInt(),
-      sweetnessScore: _sweetness.toInt(),
-      bodyScore: _body.toInt(),
-      tastingNotes: _notesCtrl.text,
-    );
+    if (_isEditing) {
+      final updatedLog = BrewLog(
+        id: widget.existingLog!.id,
+        beanId: widget.bean.id!,
+        methodId: _selectedMethod?.id ?? widget.existingLog!.methodId,
+        appliedMethod:
+            _selectedMethod?.methodName ?? widget.existingLog!.appliedMethod,
+        dateOfMaking: widget.existingLog!.dateOfMaking,
+        brewMethod: _brewMethod,
+        equipment: _equipment,
+        grinder: _grinder,
+        grindSize: _grindSize,
+        dose: _dose,
+        waterMass: _waterMass,
+        temperature: _temperature,
+        brewTimeSeconds: (_timeMin * 60) + _timeSec,
+        acidityScore: _acidity.toInt(),
+        sweetnessScore: _sweetness.toInt(),
+        bodyScore: _body.toInt(),
+        tastingNotes: _notesCtrl.text,
+      );
 
-    // Save logic that triggers the inventory math!
-    await BrewLogController.addLog(ref, newLog, widget.bean);
+      await BrewLogController.updateLog(
+        ref,
+        updatedLog,
+        widget.existingLog!.dose,
+        widget.bean,
+      );
 
-    // Refresh the home screen so the remaining weight updates instantly
-    ref.invalidate(beanProvider);
+      if (mounted) Navigator.pop(context);
+    } else {
+      final newLog = BrewLog(
+        beanId: widget.bean.id!,
+        dateOfMaking: DateTime.now(),
+        brewMethod: _brewMethod,
+        appliedMethod:
+            _selectedMethod?.methodName ?? widget.repeatFromLog?.appliedMethod,
+        equipment: _equipment,
+        grinder: _grinder,
+        grindSize: _grindSize,
+        dose: _dose,
+        waterMass: _waterMass,
+        temperature: _temperature,
+        brewTimeSeconds: (_timeMin * 60) + _timeSec,
+        acidityScore: _acidity.toInt(),
+        sweetnessScore: _sweetness.toInt(),
+        bodyScore: _body.toInt(),
+        tastingNotes: _notesCtrl.text,
+      );
 
-    if (mounted) Navigator.pop(context);
+      await BrewLogController.addLog(ref, newLog, widget.bean);
+      ref.invalidate(beanProvider);
+
+      if (mounted) {
+        final double remaining = widget.bean.currentWeight - _dose;
+        if (remaining <= 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Bag "${widget.bean.beanName}" is now empty! You can archive it in the Bean tab.',
+              ),
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+        Navigator.pop(context);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading)
+    if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
     return Scaffold(
       extendBodyBehindAppBar:
@@ -122,7 +207,13 @@ class _AddBrewScreenState extends ConsumerState<AddBrewScreen> {
             child: AppBar(
               backgroundColor: Colors.white.withValues(alpha: 0.6),
               scrolledUnderElevation: 0.0, // Kills the grey scroll tint!
-              title: const Text('Prepare Recipe'),
+              title: Text(
+                _isEditing
+                    ? 'Edit Brew Log'
+                    : (widget.repeatFromLog != null
+                        ? 'Repeat Brew'
+                        : 'Prepare Recipe'),
+              ),
               actions: [
                 IconButton(
                   icon: const Icon(Icons.save, color: CoffeeColors.primary),
@@ -187,6 +278,27 @@ class _AddBrewScreenState extends ConsumerState<AddBrewScreen> {
                       fontSize: 13,
                     ),
                   ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: CoffeeColors.accent.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      _dose > 0
+                          ? '1:${(_waterMass / _dose).toStringAsFixed(1)} Ratio'
+                          : '-',
+                      style: GoogleFonts.montserrat(
+                        fontWeight: FontWeight.bold,
+                        color: CoffeeColors.primary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 24),
@@ -206,10 +318,10 @@ class _AddBrewScreenState extends ConsumerState<AddBrewScreen> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: CoffeeColors.primary.withOpacity(0.05),
+                          color: CoffeeColors.primary.withValues(alpha: 0.05),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: CoffeeColors.primary.withOpacity(0.2),
+                            color: CoffeeColors.primary.withValues(alpha: 0.2),
                           ),
                         ),
                         child: DropdownButtonHideUnderline(
@@ -637,7 +749,7 @@ class _AddBrewScreenState extends ConsumerState<AddBrewScreen> {
           border: Border.all(color: Colors.grey.shade200),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.02),
+              color: Colors.black.withValues(alpha: 0.02),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),

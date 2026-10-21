@@ -102,6 +102,18 @@ flutter_launcher_icons:
   image_path: "assets/icons/coffee_log_logo.png"
   adaptive_icon_background: "#FFFFFF" 
   adaptive_icon_foreground: "assets/icons/coffee_log_logo.png"
+  web:
+    generate: true
+    image_path: "assets/icons/coffee_log_logo.png"
+    background_color: "#FFFFFF"
+    theme_color: "#FFFFFF"
+  windows:
+    generate: true
+    image_path: "assets/icons/coffee_log_logo.png"
+    icon_size: 48
+  macos:
+    generate: true
+    image_path: "assets/icons/coffee_log_logo.png"
 
 flutter_native_splash:
   color: "#FFFFFF"
